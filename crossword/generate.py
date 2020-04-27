@@ -147,7 +147,7 @@ class CrosswordCreator():
         # if arcs == None: queue = all arcs in problem
         if arcs == None:
             queue = list()
-            # call self.crossword.overlaps().keys() to get all overlapping pairs of variables in the problem
+            # call self.crossword.overlaps.keys() to get all overlapping pairs of variables in the problem
             for k, v in self.crossword.overlaps.items():
                 if v != None:
                     queue.append(k)
@@ -253,7 +253,7 @@ class CrosswordCreator():
         # smallest remaining values
         min_remaining_values = list(sorted_var_analysis.values())[0][0]
         # create sub dictionary of variables with smallest remaining values in domains
-        min_domain = {k:v for (k, v) in sorted_var_analysis.items() if v[0] == min_remaining_values}
+        min_domain = {k: v for (k, v) in sorted_var_analysis.items() if v[0] == min_remaining_values}
         # sort min_domain by degrees
         sorted_min_domain = dict(sorted(min_domain.items(), key=operator.itemgetter(1)))
         # pick variable with highest degree
@@ -299,6 +299,7 @@ class CrosswordCreator():
                     if result != None:
                         return result
         return None
+
 
 def main():
 
