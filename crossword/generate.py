@@ -102,7 +102,7 @@ class CrosswordCreator():
          constraints; in this case, the length of the word.)
         """
         for var in self.domains.keys():
-            words = copy.deepcopy(self.domains[var])
+            words = self.domains[var].copy()
             for word in words:
                 if len(word) != var.length:
                     self.domains[var].remove(word)
@@ -118,11 +118,13 @@ class CrosswordCreator():
         """
         revised = False
         overlap = self.crossword.overlaps[x, y]
-        if len(overlap) != 0:
-            x_domain_copy = copy.deepcopy(self.domains[x])
-            # looping through x_val in x's domain - if this can stop right when the first valid y_val is found --> faster
+        # if x and y are overlapping
+        if overlap != None:
+            # make copy of x's domain just to iterate through
+            # then remove x value in its actual domain
+            x_domain_copy = self.domains[x].copy()
             for x_val in x_domain_copy:
-                y_domain_copy = copy.deepcopy(self.domains[y])
+                y_domain_copy = self.domains[y].copy()
                 for y_val in self.domains[y]:
                     if y_val == x_val:
                         y_domain_copy.remove(y_val)
@@ -130,6 +132,7 @@ class CrosswordCreator():
                         i, j = overlap
                         if x_val[i] != y_val[j]:   
                             y_domain_copy.remove(y_val)
+                # if there's no value left in y's domain after enforcing arc consistent --> remove this x value
                 if len(y_domain_copy) == 0:
                     self.domains[x].remove(x_val)
                     revised = True 
@@ -146,17 +149,16 @@ class CrosswordCreator():
         """
         # if arcs == None: queue = all arcs in problem
         if arcs == None:
-            queue = list()
-            # call self.crossword.overlaps.keys() to get all overlapping pairs of variables in the problem
-            for k, v in self.crossword.overlaps.items():
-                if v != None:
-                    queue.append(k)
+            # iterate through self.crossword.overlaps.items() to get all pairs of variables in the problem with overlap value != None
+            queue = [k for (k, v) in self.crossword.overlaps.items() if v != None]
 
-        # elif arcs != None: queue = arcs
+        # if arcs != None: queue = arcs
         else:
             queue = arcs
 
+        # queue - first in first out
         while len(queue) != 0:
+            # dequeue queue - removing from the right
             arc = queue.pop()
             x, y = arc
             if self.revise(x, y):
@@ -164,8 +166,8 @@ class CrosswordCreator():
                     return False
                 x_other_neighbors = self.crossword.neighbors(x) - {y}
                 for z in x_other_neighbors:
+                    # enqueue - adding to the right
                     queue.append((z, x))
-
         return True                  
 
     def assignment_complete(self, assignment):
@@ -178,7 +180,7 @@ class CrosswordCreator():
         assignment_keys = set(assignment.keys())
         if assignment_keys == crossword_variables:
             # check if all values in assignment are not empty string
-            if all(v != "" for v in assignment.values()):
+            if all(value != "" for value in assignment.values()):
                 return True
         return False
 
@@ -188,14 +190,17 @@ class CrosswordCreator():
         puzzle without conflicting characters); return False otherwise.
         """
         assignment_values = list(assignment.values())
-        # if no duplicated values in assignment values
+        # if there are no duplicated values in assignment values
         if len(set(assignment_values)) == len(assignment_values):
-            # if val has correct var length:
+            # if all values have correct var lengths:
             if all(len(val) == var.length for (var, val) in assignment.items()):
-                for k, v in self.crossword.overlaps.items():
-                    v1, v2 = k
-                    if (v != None) and (v1 in assignment.keys()) and (v2 in assignment.keys()):
-                        i, j = v
+                # iterate through overlaps
+                for key, val in self.crossword.overlaps.items():
+                    v1, v2 = key
+                    # if value for that pair != None and both v1 and v2 are in assignments
+                    if (val != None) and (v1 in assignment.keys()) and (v2 in assignment.keys()):
+                        # check if v1's index i character is the same as v2's index j character
+                        i, j = val
                         if assignment[v1][i] != assignment[v2][j]:
                             return False
                 return True
@@ -208,21 +213,30 @@ class CrosswordCreator():
         The first value in the list, for example, should be the one
         that rules out the fewest values among the neighbors of `var`.
         """
-        unassigned_neighbors = list()
+        # get all of variable var's unassigned neighbors
         unassigned_variables = set(self.crossword.variables) - set(assignment.keys())
-        for x in self.crossword.neighbors(var):
-            if x in unassigned_variables:
-                unassigned_neighbors.append(x)
+        unassigned_neighbors = [x for x in self.crossword.neighbors(var) if x in unassigned_variables]
+        # create dictionary val_n with
+        # key = values in var's domain
+        # value = possible choices for var's unassigned neighbors (n)
         val_n = dict()
         for val in self.domains[var]:
+            # initialize all n values to 0
             val_n[val] = 0
+            # iterate through all unassigned neighbors
             for neighbor in unassigned_neighbors:
+                # clean up neighbor's domain by removing val (if it's in there)
                 neighbor_domain = set(self.domains[neighbor]) - {val}
+                # make copy of neighbor's domain to loop through
                 neighbor_domain_copy = neighbor_domain.copy()
+                # get overlap indexes
                 i, j = self.crossword.overlaps[var, neighbor]
+                # remove more values from neighbor's domain 
+                # if neighbor's index j character != var's index i character
                 for neighbor_val in neighbor_domain_copy:
                     if neighbor_val[j] != val[i]:
                         neighbor_domain.remove(neighbor_val)
+                # count the number of values left in neighbor's domain
                 val_n[val] += len(neighbor_domain)
         
         # sort val_n dictionary by value in ascending order
@@ -248,15 +262,15 @@ class CrosswordCreator():
             var_analysis[var][0] += len(self.domains[var])
             var_analysis[var][1] += len(self.crossword.neighbors(var))
         
-        # sort var_analysis by remaining values
+        # sort var_analysis by remaining values - ascending order
         sorted_var_analysis = dict(sorted(var_analysis.items(), key=operator.itemgetter(1)))
-        # smallest remaining values
+        # get smallest remaining values in sorted val_n
         min_remaining_values = list(sorted_var_analysis.values())[0][0]
-        # create sub dictionary of variables with smallest remaining values in domains
+        # create sub dictionary of variables with min remaining values in domains
         min_domain = {k: v for (k, v) in sorted_var_analysis.items() if v[0] == min_remaining_values}
-        # sort min_domain by degrees
+        # sort min_domain by degree values - ascending order
         sorted_min_domain = dict(sorted(min_domain.items(), key=operator.itemgetter(1)))
-        # pick variable with highest degree
+        # pick variable with highest degrees - last key
         output = list(sorted_min_domain.keys())[-1]
         
         return output
@@ -275,21 +289,19 @@ class CrosswordCreator():
         else:
             unassigned_variables = set(self.crossword.variables) - set(assignment.keys())
             var = self.select_unassigned_variable(assignment)
-            queue = list()
-            for neighbor in self.crossword.neighbors(var):
-                if not neighbor in assignment.keys():
-                    queue.append((neighbor, var))
+            queue = [(neighbor, var) for neighbor in self.crossword.neighbors(var) if not neighbor in assignment.keys()]
             # get ordered domain for this var
             ordered_domain = self.order_domain_values(var, assignment)
+            # iterate through ordered domain, start with value with least-constraining value
             for value in ordered_domain:
                 new_assignment = assignment.copy()
-                # add var: value pair to assignment {}
+                # add {var: value} pair to assignment
                 new_assignment[var] = value
                 # if new assignment is consistent
                 if self.consistent(new_assignment):
                     # if ac3 returns True --> arc consistency is enforced and no domains are empty
                     if self.ac3(arcs=queue):
-                        # check to see if any variable has a domain with 1 value left
+                        # check to see if any unassigned variable has a domain with 1 value left 
                         # add those new inferences to assignment
                         for x in unassigned_variables:
                             if len(self.domains[x]) == 1 and (not x in new_assignment.keys()):
